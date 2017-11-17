@@ -1,0 +1,143 @@
+<html>
+  <head>
+    <title>Mission Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />    
+
+    <style type="text/css">
+      html, body { 
+        margin: 0; 
+        padding: 0; 
+        font-family: Menlo, monospace;
+        color: #00ff00;
+        background: #000;
+      }
+
+      .target-list {
+        list-style-type: none;
+        border: 2px solid #00ff00;
+        padding: 0;
+      }
+
+      .target-list li {
+        padding: 16px;
+      }
+
+      .target-list li:not(:last-child) {
+        border-bottom: 2px solid #00ff00;
+      }
+
+      .state {
+        display: none;
+        height: 100vh;
+        width: 100vw;
+        padding: 16px;
+        box-sizing: border-box;
+        flex-direction: column;
+      }
+
+      .state--active {
+        display: flex;
+      }
+
+      .button--fire {
+        background-color: #ff0000;
+        border: none;
+        padding: 16px;
+        font-family: inherit;
+        color: #fff;
+        font-weight: bold;
+        font-size: 18px;
+        border-radius: 0;
+      }
+
+      .target-details {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        flex-direction: column;
+        margin: 8px 0;
+      }
+
+      .target-parameters {
+        list-style-type: none;
+        padding: 0;
+      }
+
+      .small-caps {
+        font-variant: small-caps;
+        font-weight: bold;
+      }
+
+      .neutralized {
+        text-decoration: line-through;
+        color: #ff0000;
+      }
+
+      h1 {
+        text-align: center;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="state state--active state--target-selection">
+      <h1>SELECT A TARGET</h1>
+      <ul class="target-list">
+        <li onclick="acquireTarget(0)" class="neutralized">Kobayashi, Kevin</li>
+        <li onclick="acquireTarget(1)">Monterrosa, Juan</li>
+        <li onclick="acquireTarget(2)">Forster, Matt</li>
+        <li onclick="acquireTarget(3)">Stewart, Tyler</li>
+        <li onclick="acquireTarget(4)">Rabl, Chris</li>
+      </ul>
+    </div>
+
+    <div class="state state--target-acquisition">
+      <h1>TARGET ACQUIRED</h1>
+
+      <div class="target-details">
+        <img src="//placehold.it/300x300" />
+
+        <ul class="target-parameters">
+          <li><span class="small-caps">target name:</span> Kobayashi, Kevin</li>
+          <li><span class="small-caps">coordinates:</span> 49.123498, -112.298374</li>
+        </ul>
+      </div>
+
+      <button class="button--fire" onclick="fireAtTarget()">FIRE</button>
+    </div>
+
+    <div class="state state--target-neutralized">
+      <h1>TARGET NEUTRALIZED</h1>
+    </div>
+
+    <script src="jquery-3.2.1.min.js"></script>
+    <script type="text/javascript">
+      function acquireTarget(target_id) {
+        // alert('shot ' + target_id);
+        transitionToAcquisitionState(target_id);
+      }
+
+      function fireAtTarget() {
+        transitionToNeutralizedState();
+      }
+
+      function transitionToAcquisitionState(target_id) {
+        $('.state--target-selection').toggleClass('state--active') // hide
+        $('.state--target-acquisition').toggleClass('state--active') // show
+        //
+      }
+
+      function transitionToNeutralizedState(target_id) {
+        $('.state--target-acquisition').toggleClass('state--active') // hide
+        $('.state--target-neutralized').toggleClass('state--active') // show
+
+        setTimeout(() => transitionToTargetList(), 1500);
+      }
+
+      function transitionToTargetList() {
+        $('.state--target-neutralized').toggleClass('state--active') // hide
+        $('.state--target-selection').toggleClass('state--active') // show
+      }
+    </script>
+  </body>
+</html>
