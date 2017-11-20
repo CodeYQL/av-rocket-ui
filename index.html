@@ -1,30 +1,60 @@
 <html>
   <head>
     <title>Mission Control</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
     <style type="text/css">
-      html, body { 
-        margin: 0; 
-        padding: 0; 
+      html, body {
+        margin: 0;
+        padding: 0;
         font-family: Menlo, monospace;
         color: #00ff00;
         background: #000;
       }
 
-      .target-list {
+      #target-list {
         list-style-type: none;
         border: 2px solid #00ff00;
         padding: 0;
       }
 
-      .target-list li {
+      #target-list li {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+      }
+
+      #target-list li:not(:last-child) {
+        border-bottom: 2px solid #00ff00;
+      }
+
+      #target-list li a {
+        display: flex;
+        padding: 16px;
+        flex-grow: 1;
+      }
+
+      #target-list li span {
         padding: 16px;
       }
 
-      .target-list li:not(:last-child) {
-        border-bottom: 2px solid #00ff00;
+      .target {
+
       }
+
+      .target--selected {
+        background-color: #333;
+      }
+
+      .target--neutralized {
+        text-decoration: line-through;
+        color: #ff0000;
+      }
+
+      /*.target--edit {
+        padding: 16px;
+        margin:5px;
+      }*/
 
       .state {
         display: none;
@@ -39,8 +69,29 @@
         display: flex;
       }
 
-      .button--fire {
-        background-color: #ff0000;
+      .state--target-edit > div {
+        margin: 6px 0;
+        display: flex;
+      }
+
+      .state--target-edit > div label {
+        width: 100px;
+        flex-shrink: 1;
+      }
+
+      .state--target-edit > div span {
+        flex-grow: 1;
+      }
+
+      .state--target-edit > div span input,
+        .state--target-edit > div span textarea {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 4px;
+        font-size: 16px;
+      }
+
+      button {
         border: none;
         padding: 16px;
         font-family: inherit;
@@ -48,6 +99,31 @@
         font-weight: bold;
         font-size: 18px;
         border-radius: 0;
+      }
+      button.button--fire {
+        background-color: #ff0000;
+      }
+      button.button--fire:disabled {
+        background-color: grey;
+      }
+      button.button--add {
+        background-color: #3CAB7E;
+        align-self: flex-end;
+      }
+      button.button--save {
+        background-color: #3CAB7E;
+      }
+      button.button--back {
+        float: left;
+        font-size: 12px;
+        display: inline-block;
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        padding: 12px;
+        background-color: transparent;
+        border: 2px solid #00ff00;
+        color: #00ff00;
       }
 
       .target-details {
@@ -68,13 +144,13 @@
         font-weight: bold;
       }
 
-      .neutralized {
-        text-decoration: line-through;
-        color: #ff0000;
+      .blurred {
+        -webkit-filter: blur(1px);
       }
 
       h1 {
         text-align: center;
+        display: block;
       }
     </style>
   </head>
@@ -82,62 +158,251 @@
   <body>
     <div class="state state--active state--target-selection">
       <h1>SELECT A TARGET</h1>
-      <ul class="target-list">
-        <li onclick="acquireTarget(0)" class="neutralized">Kobayashi, Kevin</li>
-        <li onclick="acquireTarget(1)">Monterrosa, Juan</li>
-        <li onclick="acquireTarget(2)">Forster, Matt</li>
-        <li onclick="acquireTarget(3)">Stewart, Tyler</li>
-        <li onclick="acquireTarget(4)">Rabl, Chris</li>
-      </ul>
+      <ul id="target-list"></ul>
+      <button class="button--add" onClick="preprateAddTarget()">ADD TARGET</button>
+      <button class="button--fire" disabled="true" onclick="prepareToFire()">FIRE</button>
     </div>
 
-    <div class="state state--target-acquisition">
-      <h1>TARGET ACQUIRED</h1>
+    <div class="state state--target-edit">
+      <button class="button--back" onClick="transitionToListTargetState()">BACK</button>
+      <h1>EDIT TARGET</h1>
 
-      <div class="target-details">
-        <img src="//placehold.it/300x300" />
-
-        <ul class="target-parameters">
-          <li><span class="small-caps">target name:</span> Kobayashi, Kevin</li>
-          <li><span class="small-caps">coordinates:</span> 49.123498, -112.298374</li>
-        </ul>
+      <div>
+        <label class="nameLabel"> Name </label>
+        <span><input type="text" name="name" /></span>
       </div>
 
-      <button class="button--fire" onclick="fireAtTarget()">FIRE</button>
-    </div>
+      <div>
+        <label class="commandLabel"> Commands </label>
+        <span><textarea rows="10" name="commands"></textarea></span>
+      </div>
 
-    <div class="state state--target-neutralized">
-      <h1>TARGET NEUTRALIZED</h1>
+      <button class="button--save" onclick="saveTarget()">SAVE</button>
     </div>
 
     <script src="jquery-3.2.1.min.js"></script>
     <script type="text/javascript">
-      function acquireTarget(target_id) {
-        // alert('shot ' + target_id);
-        transitionToAcquisitionState(target_id);
+      const BASE_URL = 'http://0e1eb216.ngrok.io';
+
+      function buildUrl(path) {
+        return `${BASE_URL}/${path}`;
+      }
+
+      function fetchTargets() {
+        const list = $('#target-list');
+        $.ajax({
+          url: buildUrl('targets'),
+          method: 'GET'
+        })
+        .fail(onError)
+        .done(onDone);
+
+        function onDone(data) {
+          clearList();
+          data.forEach(target => addTargetToList(target));
+        }
+
+        function onError(err) {
+          console.log('fail')
+        }
+      }
+
+      function clearList() {
+        const list = $('#target-list');
+        list.empty();
+      }
+
+      function addTargetToList(target) {
+        const list = $('#target-list');
+        list.append(`
+          <li class="target-item" data-target-id="${target.id}">
+            <a onclick="selectTarget('${target.id}')">${target.name}</a>
+            <span onclick="prepareEditTarget('${target.id}')">Edit</span>
+          </li>`);
+      }
+
+      function clearSelectedTarget() {
+        const list = $('#target-list');
+        list.children('li').each(function () {
+          $(this).removeClass('target--selected');
+        });
+      }
+
+      function selectTarget(targetID) {
+        if (isFiring()) return;
+
+        const target = $(`li[data-target-id=${targetID}]`);
+        const isSelected = target.hasClass('target--selected');
+        const isNeutralized = target.hasClass('target--neutralized');
+
+        if (isNeutralized) return;
+
+        clearSelectedTarget();
+
+        if (!isSelected) {
+          target.addClass('target--selected');
+        }
+
+        checkFireButtonStatus();
+      }
+
+      function neutralizedTarget(targetID) {
+        const target = $(`li[data-target-id=${targetID}]`);
+        target.addClass('target--neutralized');
+      }
+
+      function checkFireButtonStatus() {
+        const button = $('.button--fire');
+        const target = getSelectedTarget();
+
+        if (target) {
+          button.removeAttr('disabled');
+        } else {
+          button.attr('disabled', true);
+        }
+      }
+
+      function getSelectedTarget() {
+        const list = $('#target-list');
+        const [target] = list.find('li.target--selected');
+        if (!target) return null;
+        return $(target);
+      }
+
+      function isFiring() {
+        const button = $('.button--fire');
+        return button.hasClass('firing');
+      }
+
+      function prepareToFire() {
+        const button = $('.button--fire');
+
+        button.prop('disabled', true);
+        button.addClass('firing');
+
+        startCountdown(button);
+        setTimeout(fireAtTarget, 3000);
+      }
+
+      function startCountdown(element) {
+        let timer = 3;
+
+        element.text(timer);
+        const countDownTimerId = setInterval(function () {
+          timer--;
+          element.text(timer);
+          if (timer === 0) clearTimeout(countDownTimerId);
+        }, 1000);
       }
 
       function fireAtTarget() {
-        transitionToNeutralizedState();
+        const button = $('.button--fire');
+        const target = getSelectedTarget();
+        if (!target) return;
+
+        const targetID = target.attr('data-target-id');
+
+        $.ajax({
+          url: buildUrl(`targets/${targetID}/fire`),
+          method: 'GET'
+        })
+        .fail(onError)
+        .done(onDone)
+        .always(cleanup);
+
+        function onDone(data) {
+          neutralizedTarget(targetID);
+          clearSelectedTarget();
+        }
+
+        function onError(err) {
+
+        }
+
+        function cleanup() {
+          button.text('FIRE');
+          button.removeClass('firing');
+        }
       }
 
-      function transitionToAcquisitionState(target_id) {
+      function saveTarget() {
+        const targetID = $(this).prop('data-target-id');
+
+        function _buildRequest() {
+          if (targetID) {
+            const path = `targets/${targetID}`;
+            return {
+              url: buildUrl(path),
+              method: 'PUT'
+            }
+          } else {
+            const path = 'targets';
+            return {
+              url: buildUrl(path),
+              method: 'POST'
+            }
+          }
+        }
+
+        const request = _buildRequest();
+        $.ajax(request)
+        .fail(onError)
+        .done(onDone)
+
+        function onError(err) {
+
+        }
+
+        function onDone() {
+
+        }
+      }
+
+      function preprateAddTarget() {
+        $('.state--target-edit input[name="name"]').val('');
+        $('.state--target-edit textarea[name="commands"]').val('');
+
+        transitionToEditTargetState();
+      }
+
+      function prepareEditTarget(targetID) {
+        //state--target-edit
+
+        $.ajax({
+          url: buildUrl(`targets/${targetID}`),
+          method: 'GET'
+        })
+        .fail(onError)
+        .done(onDone);
+
+        function onError(err) {
+
+        }
+
+        function onDone(data) {
+          const name = data.name;
+          const commands = JSON.stringify(data.commands, null, 2);
+
+          $('.state--target-edit input[name="name"]').val(name);
+          $('.state--target-edit textarea[name="commands"]').val(commands);
+
+          transitionToEditTargetState();
+        }
+      }
+
+      function transitionToEditTargetState() {
         $('.state--target-selection').toggleClass('state--active') // hide
-        $('.state--target-acquisition').toggleClass('state--active') // show
-        //
+        $('.state--target-edit').toggleClass('state--active') // show
       }
 
-      function transitionToNeutralizedState(target_id) {
-        $('.state--target-acquisition').toggleClass('state--active') // hide
-        $('.state--target-neutralized').toggleClass('state--active') // show
-
-        setTimeout(() => transitionToTargetList(), 1500);
-      }
-
-      function transitionToTargetList() {
-        $('.state--target-neutralized').toggleClass('state--active') // hide
+      function transitionToListTargetState() {
+        $('.state--target-edit').toggleClass('state--active') // hide
         $('.state--target-selection').toggleClass('state--active') // show
       }
+
+      $(document).ready(function () {
+        fetchTargets();
+      });
     </script>
   </body>
 </html>
